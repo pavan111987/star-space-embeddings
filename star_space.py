@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import random
 from scipy.spatial.distance import cosine as dist
+from sklearn.metrics import confusion_matrix
+from matplotlib import pyplot as plt
 
 
 class StarSpaceShip:
@@ -149,3 +151,40 @@ class StarSpaceShip:
         
         return distance_dict, actual_target
 
+    def save_projector_tensorflow_files(self):
+        '''
+        This method prepares the held-out set to enable PCA visualization using https://projector.tensorflow.org/
+        To do this we need two TSV files one containing the floating point tab serperated embeddings file
+        The other file has labels for each of the rows
+        '''
+        testset_embeddings = self.input_encoder_model.predict(self.test_positive_input_batches)
+        testset_embeddings = testset_embeddings[:, 0, :].astype('U25')
+        
+        with open("visualization/projector_tensorflow_data/test_embedding_vectors.tsv", "w") as f:
+            f.write("\n".join(["\t".join(testset_embedding) for testset_embedding in testset_embeddings]))
+
+        f.close()
+
+        with open("visualization/projector_tensorflow_data/test_embedding_labels.tsv", "w") as f:
+            f.write("\n".join([str(label[0]) for label in self.test_positive_batch_targets]))
+
+        f.close()
+
+    def plot_confusion_matrix(self):
+        labels = list(range(10))
+        y_pred = []
+        y_true = []
+        for idx, test_positive_input in enumerate(self.test_positive_input_batches):
+            scores = [score for _, score in self.predict_class(test_positive_input.reshape(1, 1, 784))[0].items()]
+            y_pred.append(np.argmax(scores))
+            y_true.append(self.test_positive_batch_targets[idx][0])
+
+        cm = confusion_matrix(y_true, y_pred, labels)
+        
+        labels = [str(label) for label in labels]
+
+        plt.imshow(cm, interpolation='nearest')
+        plt.xticks(np.arange(0, 10), labels)
+        plt.yticks(np.arange(0, 10), labels)
+
+        plt.savefig("visualization/confusion_matrix.png")
